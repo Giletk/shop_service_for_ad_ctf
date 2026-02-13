@@ -76,7 +76,14 @@ python sploit.py localhost 5000
 
 Добавить валидацию цены в `app.py`:
 
+Было
 ```python
-if price < 0:
-    return render_template_string(ADD_ITEM_PAGE, error="Price must be positive!")
+user['balance'] -= total_cost
+    
+```
+
+Стало
+```
+if total_cost > 0:
+    user['balance'] -= total_cost
 ```
