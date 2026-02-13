@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="shop-header">
+        <div class="container">
+            <h1>🛒 Shop</h1>
+            <div class="user-info">
+                <span>{{ username }}</span>
+                <span class="balance">Balance: <strong id="balance">{{ balance }}</strong> credits</span>
+                <a href="{{ url_for('cart') }}" class="btn btn-small">🛒 Cart</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-small">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="items-grid">
+            {% for item in items %}
+            <div class="item-card" data-item-id="{{ item.id }}">
+                <div class="item-image">
+                    <img src="{{ url_for('static', filename='images/' + item.image) }}" alt="{{ item.name }}" onerror="this.src='{{ url_for('static', filename='images/placeholder.jpg') }}'">
+                </div>
+                <div class="item-info">
+                    <h3>{{ item.name }}</h3>
+                    <p class="price">{{ item.price }} credits</p>
+                    
+                    <button class="btn btn-buy" onclick="addToCart('{{ item.id }}')">Add to Cart</button>
+                    
+                    {% if item.id in purchased_items %}
+                        <button class="btn btn-secret" onclick="showSecrets('{{ item.id }}', '{{ item.name }}')">Show Secrets</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div id="secretModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeSecretModal()">&times;</span>
+            <h2>Secrets for <span id="secretItemName"></span></h2>
+            <div id="secretsList"></div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        function showNotification(message, type = 'success') {
+            const notif = document.getElementById('notification');
+            notif.textContent = message;
+            notif.className = 'notification ' + type + ' show';
+            setTimeout(() => {
+                notif.className = 'notification';
+            }, 3000);
+        }
+
+        function updateBalance(newBalance) {
+            document.getElementById('balance').textContent = newBalance;
+        }
+
+        function addToCart(itemId) {
+            fetch('/add_to_cart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'item_id=' + itemId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Added ' + data.item_name + ' to cart!', 'success');
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error: ' + error, 'error');
+            });
+        }
+
+        function showSecrets(itemId, itemName) {
+            fetch('/get_secrets?item_id=' + itemId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('secretItemName').textContent = itemName;
+                    const secretsList = document.getElementById('secretsList');
+                    if (data.secrets && data.secrets.length > 0) {
+                        secretsList.innerHTML = '<ul class="secrets-list">' + 
+                            data.secrets.map(s => '<li>' + s + '</li>').join('') + 
+                            '</ul>';
+                    } else {
+                        secretsList.innerHTML = '<p>No secrets stored for this item.</p>';
+                    }
+                    document.getElementById('secretModal').style.display = 'block';
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error: ' + error, 'error');
+            });
+        }
+
+        function closeSecretModal() {
+            document.getElementById('secretModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('secretModal');
+            if (event.target == modal) {
+                closeSecretModal();
+            }
+        }
+    </script>
+</body>
+</html>

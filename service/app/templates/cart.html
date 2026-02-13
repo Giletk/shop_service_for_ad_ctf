@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cart</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="shop-header">
+        <div class="container">
+            <h1>🛒 Shopping Cart</h1>
+            <div class="user-info">
+                <span>{{ username }}</span>
+                <span class="balance">Balance: <strong id="balance">{{ balance }}</strong> credits</span>
+                <a href="{{ url_for('shop') }}" class="btn btn-small">Continue Shopping</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-small">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        {% if cart_items %}
+        <form id="checkoutForm">
+            <div class="cart-items">
+                {% for item in cart_items %}
+                <div class="cart-item">
+                    <div class="cart-item-image">
+                        <img src="{{ url_for('static', filename='images/' + item.image) }}" alt="{{ item.name }}">
+                    </div>
+                    <div class="cart-item-info">
+                        <h3>{{ item.name }}</h3>
+                        <p class="price">{{ item.price }} credits</p>
+                    </div>
+                    <div class="cart-item-quantity">
+                        <label for="quantity_{{ item.id }}">Quantity:</label>
+                        <input type="number" 
+                               id="quantity_{{ item.id }}" 
+                               name="quantity_{{ item.id }}" 
+                               value="1" 
+                               min="1" 
+                               max="999"
+                               oninput="validateQuantity(this)"
+                               onchange="updateTotal()">
+                    </div>
+                    <div class="cart-item-subtotal">
+                        <span class="subtotal" data-price="{{ item.price }}" data-item="{{ item.id }}">{{ item.price }}</span> credits
+                    </div>
+                    <div class="cart-item-actions">
+                        <button type="button" class="btn-delete" onclick="removeFromCart('{{ item.id }}')" title="Remove">&times;</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="cart-total">
+                <h2>Total: <span id="totalAmount">{{ total }}</span> credits</h2>
+                <button type="button" class="btn btn-primary" onclick="checkout()">Checkout</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="empty-cart">
+            <h2>Your cart is empty</h2>
+            <a href="{{ url_for('shop') }}" class="btn btn-primary">Go to Shop</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        function showNotification(message, type = 'success') {
+            const notif = document.getElementById('notification');
+            notif.textContent = message;
+            notif.className = 'notification ' + type + ' show';
+            setTimeout(() => {
+                notif.className = 'notification';
+            }, 3000);
+        }
+
+        function updateBalance(newBalance) {
+            document.getElementById('balance').textContent = newBalance;
+        }
+
+        function validateQuantity(input) {
+            // Удаляем нули в начале
+            input.value = input.value.replace(/^0+/, '');
+            
+            let value = parseFloat(input.value);
+            
+            // Если значение не число, отрицательное или ноль, устанавливаем 1
+            if (isNaN(value) || value <= 0) {
+                input.value = 1;
+            } else if (value > 999) {
+                // Ограничиваем максимальное значение
+                input.value = 999;
+            } else if (!Number.isInteger(value)) {
+                // Убираем дробную часть
+                input.value = Math.floor(value);
+            }
+            
+            updateTotal();
+        }
+
+        function updateTotal() {
+            let total = 0;
+            document.querySelectorAll('.subtotal').forEach(subtotalEl => {
+                const itemId = subtotalEl.dataset.item;
+                const price = parseInt(subtotalEl.dataset.price);
+                const quantityInput = document.getElementById('quantity_' + itemId);
+                let quantity = parseInt(quantityInput.value);
+                
+                // Дополнительная проверка: если количество невалидное, устанавливаем 1
+                if (isNaN(quantity) || quantity <= 0) {
+                    quantity = 1;
+                    quantityInput.value = 1;
+                }
+                
+                const subtotal = price * quantity;
+                
+                subtotalEl.textContent = subtotal;
+                total += subtotal;
+            });
+            
+            document.getElementById('totalAmount').textContent = total;
+        }
+
+        function checkout() {
+            const formData = new FormData(document.getElementById('checkoutForm'));
+            
+            fetch('/checkout', {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Checkout successful! Total: ' + data.total_cost + ' credits', 'success');
+                    updateBalance(data.new_balance);
+                    setTimeout(() => window.location.href = '{{ url_for("shop") }}', 1500);
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error: ' + error, 'error');
+            });
+        }
+
+        function removeFromCart(itemId) {
+            fetch('/remove_from_cart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'item_id=' + itemId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Item removed from cart', 'success');
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error: ' + error, 'error');
+            });
+        }
+    </script>
+</body>
+</html>
